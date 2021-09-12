@@ -24,9 +24,6 @@ type testItem struct {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]int32)
 	mu := &sync.Mutex{}
-	//start := time.Now()
-	//fmt.Fprintf(w, "r.URL.Query().Get(\"search\") = %q\n", r.URL.Query().Get("search"))
-	//strSearchReq, _ := url.QueryUnescape(r.URL.Query().Get("search"))
 	strSearchReq := r.URL.Query().Get("search")
 	timeoutInt, err := strconv.Atoi(config.GetEnv("TIMEOUT", "5"))
 	if err != nil {
@@ -72,17 +69,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup, item responseItem, i int) {
 			defer wg.Done()
-			//result := ""
 			var successWorkers int32
 			var time time.Duration
-			//result+= fmt.Sprintf(fmt.Sprintf("[%v] %v      %v\n", i, item.Host, item.Url))
 			results := make([]testItem, len(arTreads))
 			for i, count := range arTreads {
 				successWorkers, time = TestHost(item.Url, count, requestCount, timeout)
 				results[i].maxThreads = int32(count)
 				results[i].resultThreads = successWorkers
 				results[i].timeSpent = time
-				//result+= fmt.Sprintf("max %v Success workers: %v Duration %v\n",count, successWorkers,time)
 				if successWorkers == 0 {
 					break
 				}
@@ -98,8 +92,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			mu.Lock()
 			response[item.Host] = results[finalItem].resultThreads
 			mu.Unlock()
-			//fmt.Fprint(w,result)
-			//fmt.Fprintf(w,"Final item %v ma workers %v\n",finalItem,results[finalItem].resultThreads)
 		}(wg, item, i)
 	}
 	wg.Wait()
@@ -110,12 +102,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(b)
-	//fmt.Fprintf(w,"Results: %v\n",response)
-	//allTime := time.Since(start)
-	//fmt.Printf("request all %v\n", allTime)
 	return
 }
 
+//Тестовая сессия для хоста
 func TestHost(url string, maxThreads int, requestCount int, timeout time.Duration) (int32, time.Duration) {
 	start := time.Now()
 	var end time.Duration
@@ -136,26 +126,13 @@ func TestHost(url string, maxThreads int, requestCount int, timeout time.Duratio
 					select {
 					case <-ctx.Done():
 						atomic.AddInt32(&successWorkers, 1)
-						//fmt.Printf("Good Worker [%v]    done %v success\n", workerNum, i)
 						return
 					default:
 						respItem, err := cl.Get(url)
 						if err == nil && respItem.StatusCode == http.StatusOK {
 							i++
 							out <- true
-							//fmt.Fprintf(w,"Status %v\n", respItem.StatusCode)
 						} else {
-							//if err != nil{
-							//	if err, ok := err.(net.Error); ok && err.Timeout() {
-							//		fmt.Printf("Timeout error\n")
-							//	}else {
-							//		fmt.Printf("Error request %v\n", err.Error())
-							//	}
-							//} else {
-							//	fmt.Printf("Status %v\n", respItem.Status)
-							//}
-
-							//fmt.Printf("Worker [%v]    done %v success\n", workerNum, i)
 							out <- false
 							return
 						}
@@ -181,12 +158,6 @@ func TestHost(url string, maxThreads int, requestCount int, timeout time.Duratio
 			fail++
 		}
 	}
-	//if success < needToEnd{
-	//	fmt.Printf("FAILED ALL treads\n")
-	//}else{
-	//	fmt.Printf("Success workers: %v\n",successWorkers)
-	//}
-	//fmt.Printf("Success %v\n FAIL %v\n", success,fail)
 	//0 потоков быть не может, поэтому минимум 1
 	if successWorkers == 0 {
 		successWorkers = 1
